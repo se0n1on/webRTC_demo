@@ -1,7 +1,6 @@
 'use strict';
 // create and run Web Socket connection
-const socket = new WebSocket("ws://" + window.location.host + "/signal");
-
+const socket = new WebSocket("wss://" + location.host + "/signal");
 
 
 // UI elements
@@ -14,7 +13,7 @@ const localRoom = document.querySelector('input#id').value;
 const localVideo = document.getElementById('local_video');
 const remoteVideo = document.getElementById('remote_video');
 const localUserName = localStorage.getItem("uuid");
-
+let myName = document.getElementById("userName").value;
 // WebRTC STUN servers
 const peerConnectionConfig = {
     'iceServers': [
@@ -23,10 +22,18 @@ const peerConnectionConfig = {
     ]
 };
 
-// WebRTC media
+// 화상용
 const mediaConstraints = {
     audio: true,
     video: true
+};
+
+// 화면공유용
+var displayConstraints = {
+    video: {
+        cursor: "always"
+    },
+    audio: { echoCancellation: true, noiseSuppression: true }
 };
 
 // WebRTC variables
@@ -37,6 +44,7 @@ let myPeerConnection;
 // on page load runner
 $(function(){
     start();
+    init();
 });
 
 function start() {
@@ -44,8 +52,18 @@ function start() {
     socket.onmessage = function(msg) {
         let message = JSON.parse(msg.data);
         switch (message.type) {
+            case "videoStreamOn": case "videoStreamOff": case "audioStreamOn": case "audioStreamOff":
+                if(message.from !== localUserName){
+                    log('Stream message recieved')
+                    handleStreamMessage(message);
+                }
+                break;
+
             case "text":
-                log('Text message from ' + message.from + ' received: ' + message.data);
+                if(message.from !== localUserName){
+                    log('text message recieved')
+                    receiveTextMessage(message.data);
+                }
                 break;
 
             case "offer":
@@ -64,7 +82,6 @@ function start() {
                 break;
 
             case "join":
-                log('Client is starting to ' + (message.data === "true)" ? 'negotiate' : 'wait for a peer'));
                 handlePeerConnection(message);
                 break;
 
@@ -139,42 +156,6 @@ function stop() {
     }
 }
 
-/*
- UI Handlers
-  */
-// mute video buttons handler
-videoButtonOff.onclick = () => {
-    alert("1");
-    localVideoTracks = localStream.getVideoTracks();
-    alert("2");
-    localVideoTracks.forEach(track => localStream.removeTrack(track));
-    alert("3");
-    $(localVideo).css('display', 'none');
-    log('Video Off');
-};
-videoButtonOn.onclick = () => {
-    alert("4");
-    localVideoTracks.forEach(track => localStream.addTrack(track));
-    alert("5");
-    $(localVideo).css('display', 'inline');
-    log('Video On');
-};
-
-// mute audio buttons handler
-audioButtonOff.onclick = () => {
-    localVideo.muted = true;
-    log('Audio Off');
-};
-audioButtonOn.onclick = () => {
-    localVideo.muted = false;
-    log('Audio On');
-};
-
-// room exit button handler
-exitButton.onclick = () => {
-    stop();
-};
-
 function log(message) {
     console.log(message);
 }
@@ -183,27 +164,10 @@ function handleErrorMessage(message) {
     console.error(message);
 }
 
-// use JSON format to send WebSocket message
-function sendToServer(msg) {
-    let msgJSON = JSON.stringify(msg);
-    socket.send(msgJSON);
-}
-
-// initialize media stream
-function getMedia(constraints) {
-    if (localStream) {
-        localStream.getTracks().forEach(track => {
-            track.stop();
-        });
-    }
-    navigator.mediaDevices.getUserMedia(constraints)
-        .then(getLocalMediaStream).catch(handleGetUserMediaError);
-}
-
 // create peer connection, get media, start negotiating when second participant appears
 function handlePeerConnection(message) {
     createPeerConnection();
-    getMedia(mediaConstraints);
+    getMedia();
     if (message.data === "true") {
         myPeerConnection.onnegotiationneeded = handleNegotiationNeededEvent;
     }
@@ -222,6 +186,41 @@ function createPeerConnection() {
     // myPeerConnection.onicegatheringstatechange = handleICEGatheringStateChangeEvent;
     // myPeerConnection.onsignalingstatechange = handleSignalingStateChangeEvent;
 }
+
+// send ICE candidate to the peer through the server
+function handleICECandidateEvent(event) {
+    if (event.candidate) {
+        sendToServer({
+            from: localUserName,
+            type: 'ice',
+            candidate: event.candidate
+        });
+        log('ICE Candidate Event: ICE candidate sent');
+    }
+}
+
+function handleTrackEvent(event) {
+    log('Track Event: set stream to remote video element');
+    remoteVideo.srcObject = event.streams[0];
+}
+
+// initialize media stream
+function getMedia() {
+    // webRtc Stream 관련(https://geoboy.tistory.com/27) // (https://gh402.tistory.com/47) // (https://dreamfuture.tistory.com/60) - 화면 공유
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            track.stop();
+        });
+    }
+    // 화상용
+    navigator.mediaDevices.getUserMedia(mediaConstraints)
+        .then(getLocalMediaStream).catch(handleGetUserMediaError);
+
+    // 화면공유용
+    // navigator.mediaDevices.getDisplayMedia(displayConstraints)
+    //     .then(getLocalMediaStream).catch(handleGetUserMediaError);
+}
+
 // add MediaStream to local video element and to the Peer
 function getLocalMediaStream(mediaStream) {
     localStream = mediaStream;
@@ -244,25 +243,7 @@ function handleGetUserMediaError(error) {
             alert("Error opening your camera and/or microphone: " + error.message);
             break;
     }
-
     stop();
-}
-
-// send ICE candidate to the peer through the server
-function handleICECandidateEvent(event) {
-    if (event.candidate) {
-        sendToServer({
-            from: localUserName,
-            type: 'ice',
-            candidate: event.candidate
-        });
-        log('ICE Candidate Event: ICE candidate sent');
-    }
-}
-
-function handleTrackEvent(event) {
-    log('Track Event: set stream to remote video element');
-    remoteVideo.srcObject = event.streams[0];
 }
 
 // WebRTC called handler to begin ICE negotiation
@@ -289,28 +270,11 @@ function handleNegotiationNeededEvent() {
 
 function handleOfferMessage(message) {
     log('Accepting Offer Message');
-    log(message);
     let desc = new RTCSessionDescription(message.sdp);
     //TODO test this
     if (desc != null && message.sdp != null) {
         log('RTC Signalling state: ' + myPeerConnection.signalingState);
         myPeerConnection.setRemoteDescription(desc).then(function () {
-            log("Set up local media stream");
-            return navigator.mediaDevices.getUserMedia(mediaConstraints);
-        })
-            .then(function (stream) {
-                log("-- Local video stream obtained");
-                localStream = stream;
-                try {
-                    localVideo.srcObject = localStream;
-                } catch (error) {
-                    localVideo.src = window.URL.createObjectURL(stream);
-                }
-
-                log("-- Adding stream to the RTCPeerConnection");
-                localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
-            })
-            .then(function () {
                 log("-- Creating answer");
                 // Now that we've successfully set the remote description, we need to
                 // start our stream up locally then create an SDP answer. This SDP
@@ -352,4 +316,179 @@ function handleNewICECandidateMessage(message) {
     let candidate = new RTCIceCandidate(message.candidate);
     log("Adding received ICE candidate: " + JSON.stringify(candidate));
     myPeerConnection.addIceCandidate(candidate).catch(handleErrorMessage);
+}
+
+function handleStreamMessage(message) {
+    switch (message.type){
+        case "videoStreamOn":
+            $(remoteVideo).css('display', 'inline');
+            break;
+        case "videoStreamOff":
+            $(remoteVideo).css('display', 'none');
+            break;
+        case "audioStreamOn":
+            remoteVideo.muted = false
+            break;
+        case "audioStreamOff":
+            remoteVideo.muted = true
+            break;
+    }
+}
+
+// use JSON format to send WebSocket message
+function sendToServer(msg) {
+    let msgJSON = JSON.stringify(msg);
+    socket.send(msgJSON);
+}
+
+/*
+ UI Handlers
+  */
+// mute video buttons handler
+videoButtonOff.onclick = () => {
+    localVideoTracks = localStream.getVideoTracks();
+    localVideoTracks.forEach(track => localStream.removeTrack(track));
+    $(localVideo).css('display', 'none');
+    log('Video Off');
+    sendToServer({
+        from: localUserName,
+        type: 'videoStreamOff',
+        data: localRoom
+    });
+};
+videoButtonOn.onclick = () => {
+    localVideoTracks.forEach(track => localStream.addTrack(track));
+    $(localVideo).css('display', 'inline');
+    log('Video On');
+    sendToServer({
+        from: localUserName,
+        type: 'videoStreamOn',
+        data: localRoom
+    });
+};
+
+// mute audio buttons handler
+audioButtonOff.onclick = () => {
+    localVideo.muted = true;
+    log('Audio Off');
+    sendToServer({
+        from: localUserName,
+        type: 'audioStreamOff',
+        data: localRoom
+    });
+};
+audioButtonOn.onclick = () => {
+    localVideo.muted = false;
+    log('Audio On');
+    sendToServer({
+        from: localUserName,
+        type: 'audioStreamOn',
+        data: localRoom
+    });
+};
+
+// room exit button handler
+exitButton.onclick = () => {
+    stop();
+};
+
+////////// 채팅 //////////
+
+// init 함수
+function init() {
+    // enter 키 이벤트
+    $(document).on('keydown', 'div.input-div textarea', function(e){
+        if(e.keyCode == 13 && !e.shiftKey) {
+            e.preventDefault();
+            const text = $(this).val();
+
+            // 메시지 전송
+            sendMessage(text);
+
+            // 입력창 clear
+            clearTextarea();
+        }
+    });
+}
+
+// 메세지 태그 생성
+function createMessageTag(LR_className, senderName, message) {
+    // 형식 가져오기
+    let chatLi = $('div.chat.format ul li').clone();
+
+    // 값 채우기
+    chatLi.addClass(LR_className);
+    chatLi.find('.sender span').text(senderName);
+    chatLi.find('.message span').text(message);
+
+    return chatLi;
+}
+
+// 메세지 태그 append
+function appendMessageTag(LR_className, senderName, message) {
+    const chatLi = createMessageTag(LR_className, senderName, message);
+
+    $('div.chat:not(.format) ul').append(chatLi);
+
+    // 스크롤바 아래 고정
+    $('div.chat').scrollTop($('div.chat').prop('scrollHeight'));
+}
+
+// 메세지 전송
+function sendMessage(text) {
+    // 서버에 전송하는 코드로 후에 대체
+    const data = `{"senderName":"${myName}", "message":"${text}"}`;
+
+    // 서버로 전송
+    sendToServer({
+        from: localUserName,
+        type: "text",
+        data: data
+    });
+
+    appendMessageTag("right", myName, text);
+}
+
+// 메세지 입력박스 내용 지우기
+function clearTextarea() {
+    $('div.input-div textarea').val('');
+}
+
+// 메세지 수신
+function receiveTextMessage(data) {
+    let parsedData = JSON.parse(data);
+    appendMessageTag("left", parsedData.senderName, parsedData.message);
+}
+
+function startCapture() {
+    try {
+        navigator.mediaDevices.getDisplayMedia(displayConstraints)
+        .then((stream) => {
+            videoElem.srcObject = stream
+            videoElem.onloadedmetadata = () => {
+                videoElem.play()
+            }
+        });
+    } catch(err) {
+        console.error("Error: " + err);
+    }
+}
+
+// 화면 공유 (현재 사용 X)
+
+function stopCapture(evt) {
+    let tracks = videoElem.srcObject.getTracks();
+    tracks.forEach(track => track.stop());
+    dumpOptionsInfo();
+    videoElem.srcObject = null;
+}
+
+function dumpOptionsInfo() {
+    if(videoElem.srcObject){
+        const videoTrack = videoElem.srcObject.getVideoTracks()[0];
+        console.info("Track settings:");
+        console.info(JSON.stringify(videoTrack.getSettings(), null, 2));
+        console.info("Track constraints:");
+        console.info(JSON.stringify(videoTrack.getConstraints(), null, 2));
+    }
 }

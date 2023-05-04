@@ -1,6 +1,7 @@
 $(function(){
     const uuidInput = document.querySelector('input#uuid');
 
+
     function guid() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             let r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -17,8 +18,9 @@ $(function(){
 });
 
 function addUuidToButtonLink(button) {
+    let userName = window.prompt('이름을 입력해주세요')
     let id = 'button-link-' + button.value;
     let ref = document.getElementById(id).href;
-    document.getElementById(id).href = ref + '/user/' + localStorage.getItem("uuid");
+    document.getElementById(id).href = ref + '/user/' + localStorage.getItem("uuid") + '/name/' + userName;
     console.log("link.href:" + document.getElementById(id).href);
 }

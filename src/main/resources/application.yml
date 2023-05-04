@@ -16,4 +16,4 @@ server:
 logging:
   level:
     org.springframework: info
-    io.github.benkoff.webrtcss: debug
+    com.huvet.tg: debug

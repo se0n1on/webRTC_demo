@@ -22,12 +22,12 @@ apply plugin: 'io.spring.dependency-management'
 apply plugin: 'com.palantir.docker'
 apply plugin: "org.sonarqube"
 
-group = 'io.github.benkoff'
+group = 'com.huvet.tg'
 version = '0.0.1-SNAPSHOT'
 sourceCompatibility = 1.8
 
 bootJar {
-    baseName = 'webrtcss-spring-boot-docker'
+    baseName = 'webrtc'
     version =  '0.1.0'
 }
 
@@ -40,6 +40,9 @@ dependencies {
     compile('org.springframework.boot:spring-boot-starter-web')
     compile('org.springframework.boot:spring-boot-starter-websocket')
     compile('org.springframework.boot:spring-boot-starter-validation')
+	compile('org.projectlombok:lombok:1.18.26')
+
+	testCompile('org.projectlombok:lombok:1.18.26')
     testCompile('org.springframework.boot:spring-boot-starter-test')
 }
 
@@ -49,10 +52,10 @@ task unpack(type: Copy) {
 	into("build/dependency")
 }
 
-docker {
-	name "benkoff/${bootJar.baseName}"
-	tags 'latest'
-	dockerfile file('Dockerfile')
-	copySpec.from(tasks.unpack.outputs).into("dependency")
-	buildArgs(['DEPENDENCY': "dependency"])
-}
+//docker {
+//	name "benkoff/${bootJar.baseName}"
+//	tags 'latest'
+//	dockerfile file('Dockerfile')
+//	copySpec.from(tasks.unpack.outputs).into("dependency")
+//	buildArgs(['DEPENDENCY': "dependency"])
+//}
