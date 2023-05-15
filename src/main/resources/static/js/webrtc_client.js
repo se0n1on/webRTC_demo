@@ -2,12 +2,13 @@
 // create and run Web Socket connection
 const socket = new WebSocket("wss://" + location.host + "/signal");
 
-
 // UI elements
 const videoButtonOff = document.querySelector('#video_off');
 const videoButtonOn = document.querySelector('#video_on');
 const audioButtonOff = document.querySelector('#audio_off');
 const audioButtonOn = document.querySelector('#audio_on');
+const sharingButtonOn = document.querySelector('#share_on');
+const sharingButtonOff = document.querySelector('#share_off');
 const exitButton = document.querySelector('#exit');
 const localRoom = document.querySelector('input#id').value;
 const localVideo = document.getElementById('local_video');
@@ -23,23 +24,22 @@ const peerConnectionConfig = {
 };
 
 // 화상용
-const mediaConstraints = {
+const userConstraints = {
     audio: true,
     video: true
 };
 
 // 화면공유용
-var displayConstraints = {
-    video: {
-        cursor: "always"
-    },
-    audio: { echoCancellation: true, noiseSuppression: true }
+const displayConstraints = {
+    audio: true,
+    video: true
 };
 
 // WebRTC variables
 let localStream;
-let localVideoTracks;
 let myPeerConnection;
+let videoFlag = true;
+let audioFlag = true;
 
 // on page load runner
 $(function(){
@@ -209,16 +209,11 @@ function getMedia() {
     // webRtc Stream 관련(https://geoboy.tistory.com/27) // (https://gh402.tistory.com/47) // (https://dreamfuture.tistory.com/60) - 화면 공유
     if (localStream) {
         localStream.getTracks().forEach(track => {
-            track.stop();
+            localStream.removeTrack(track)
         });
     }
-    // 화상용
-    navigator.mediaDevices.getUserMedia(mediaConstraints)
+    navigator.mediaDevices.getUserMedia(userConstraints)
         .then(getLocalMediaStream).catch(handleGetUserMediaError);
-
-    // 화면공유용
-    // navigator.mediaDevices.getDisplayMedia(displayConstraints)
-    //     .then(getLocalMediaStream).catch(handleGetUserMediaError);
 }
 
 // add MediaStream to local video element and to the Peer
@@ -346,8 +341,8 @@ function sendToServer(msg) {
   */
 // mute video buttons handler
 videoButtonOff.onclick = () => {
-    localVideoTracks = localStream.getVideoTracks();
-    localVideoTracks.forEach(track => localStream.removeTrack(track));
+    videoFlag = false;
+    // localStream.getVideoTracks().forEach(track => {track.stop();localStream.removeTrack(track);});
     $(localVideo).css('display', 'none');
     log('Video Off');
     sendToServer({
@@ -357,7 +352,8 @@ videoButtonOff.onclick = () => {
     });
 };
 videoButtonOn.onclick = () => {
-    localVideoTracks.forEach(track => localStream.addTrack(track));
+    videoFlag = true;
+    // localStream.getVideoTracks().forEach(track => {localStream.addTrack(track);});
     $(localVideo).css('display', 'inline');
     log('Video On');
     sendToServer({
@@ -369,6 +365,7 @@ videoButtonOn.onclick = () => {
 
 // mute audio buttons handler
 audioButtonOff.onclick = () => {
+    audioFlag = false;
     localVideo.muted = true;
     log('Audio Off');
     sendToServer({
@@ -377,7 +374,9 @@ audioButtonOff.onclick = () => {
         data: localRoom
     });
 };
+
 audioButtonOn.onclick = () => {
+    audioFlag = true;
     localVideo.muted = false;
     log('Audio On');
     sendToServer({
@@ -390,6 +389,43 @@ audioButtonOn.onclick = () => {
 // room exit button handler
 exitButton.onclick = () => {
     stop();
+};
+
+sharingButtonOn.onclick = () => {
+    localStream.getTracks().forEach(track => {track.stop();localStream.removeTrack(track);});
+
+    navigator.mediaDevices.getDisplayMedia(displayConstraints)
+        .then((mediaStream) => {
+            localStream = mediaStream;
+            localVideo.srcObject = mediaStream;
+            localStream.getTracks().forEach(track => {
+                myPeerConnection.getSenders().find((sender) => sender.track.kind === track.kind).replaceTrack(track);
+            });
+
+        }).catch(handleGetUserMediaError);
+
+    $(localVideo).css('display', 'inline');
+    localVideo.muted = false
+};
+
+sharingButtonOff.onclick = () => {
+    localStream.getTracks().forEach(track => {track.stop();localStream.removeTrack(track);});
+
+    navigator.mediaDevices.getUserMedia(userConstraints)
+        .then((mediaStream) => {
+            localStream = mediaStream;
+            localVideo.srcObject = mediaStream;
+            localStream.getTracks().forEach(track => {
+                myPeerConnection.getSenders().find((sender) => sender.track.kind === track.kind).replaceTrack(track);
+            });
+        }).catch(handleGetUserMediaError);
+
+    if(videoFlag){
+        $(localVideo).css('display', 'inline');
+    }else{
+        $(localVideo).css('display', 'none');
+    }
+    localVideo.muted = !audioFlag;
 };
 
 ////////// 채팅 //////////
@@ -458,37 +494,4 @@ function clearTextarea() {
 function receiveTextMessage(data) {
     let parsedData = JSON.parse(data);
     appendMessageTag("left", parsedData.senderName, parsedData.message);
-}
-
-function startCapture() {
-    try {
-        navigator.mediaDevices.getDisplayMedia(displayConstraints)
-        .then((stream) => {
-            videoElem.srcObject = stream
-            videoElem.onloadedmetadata = () => {
-                videoElem.play()
-            }
-        });
-    } catch(err) {
-        console.error("Error: " + err);
-    }
-}
-
-// 화면 공유 (현재 사용 X)
-
-function stopCapture(evt) {
-    let tracks = videoElem.srcObject.getTracks();
-    tracks.forEach(track => track.stop());
-    dumpOptionsInfo();
-    videoElem.srcObject = null;
-}
-
-function dumpOptionsInfo() {
-    if(videoElem.srcObject){
-        const videoTrack = videoElem.srcObject.getVideoTracks()[0];
-        console.info("Track settings:");
-        console.info(JSON.stringify(videoTrack.getSettings(), null, 2));
-        console.info("Track constraints:");
-        console.info(JSON.stringify(videoTrack.getConstraints(), null, 2));
-    }
 }
