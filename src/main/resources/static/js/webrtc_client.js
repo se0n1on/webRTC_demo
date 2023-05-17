@@ -478,7 +478,7 @@ function init() {
             e.preventDefault();
             const text = $(this).val();
 
-            // 첨부된 파일이 남아있을경우 전송
+            // 첨부된 파일이 남아있을경우 전송 div.input-div input[type=file] : 실제 화면에서 사용하는 정보로 수정 필요
             const file = $('div.input-div input[type=file]').get(0).files[0];
 
             // 메시지 전송
@@ -490,7 +490,7 @@ function init() {
         }
     });
 
-    // 파일 첨부하면 바로 전송
+    // 파일 첨부하면 바로 전송 div.input-div input[type=file] : 실제 화면에서 사용하는 정보로 수정 필요
     $(document).on('change', 'div.input-div input[type=file]', function(e){
         // 첨부파일 객체
         const file = $('div.input-div input[type=file]').get(0).files[0];
@@ -508,6 +508,32 @@ function init() {
         // 입력창 clear
         clearTextarea();
         clearFileInput();
+    });
+
+    // 파일 드롭다운 이벤트 추가 div.chat_wrap : 실제 화면에서 드롭다운 적용할 영역으로 수정
+    $('div.chat_wrap').on('dragenter', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        $(this).addClass('dragover');
+    });
+    $('div.chat_wrap').on('dragover', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+    });
+    $('div.chat_wrap').on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+        const files = e.originalEvent.dataTransfer.files;
+        const file = files[0];
+
+        // 용량 제한 체크
+        if (file && file.size > 200 * 1024 * 1024) { // 200MB 이상인 경우
+            alert("200MB 이하의 파일만 첨부 가능합니다.");
+            return;
+        }
+
+        // 메시지 전송
+        sendMessage('', file);
     });
 }
 
@@ -563,7 +589,7 @@ function clearTextarea() {
     $('div.input-div textarea').val('');
 }
 
-// 파일 첨부 입력박스 지우기
+// 파일 첨부 입력박스 지우기 div.input-div input[type=file] : 실제 화면에서 사용하는 정보로 수정 필요
 function clearFileInput() {
     $('div.input-div input[type=file]').val('');
 }
