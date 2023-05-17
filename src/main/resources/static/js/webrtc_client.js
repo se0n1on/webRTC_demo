@@ -41,6 +41,34 @@ let myPeerConnection;
 let videoFlag = true;
 let audioFlag = true;
 
+// 사용자가 말하고있는 상태 감지 코드 S
+const audioContext = new AudioContext();
+const analyserNode = audioContext.createAnalyser();
+analyserNode.fftSize = 2048;
+
+// get the frequency data from the AnalyserNode
+function getFrequencyData() {
+    // create a new array of 8-bit integers (0-255)
+    const data = new Uint8Array(analyserNode.frequencyBinCount);
+
+    // populate the array with the frequency data
+    analyserNode.getByteFrequencyData(data);
+
+    // 마이크에 감지되는 평균 볼륨 계산
+    const averageVolume = data.reduce((acc, val) => acc + val) / data.length;
+
+    // 일정 볼륨 이상으로 마이크 사용중인지 체크
+    if (averageVolume > 30) {
+        console.log("말하는중!");
+    } else {
+        console.log("말 안하고있음!");
+    }
+}
+
+// 50ms 주기로 마이크 사용 정보 체크
+setInterval(getFrequencyData, 50);
+// 사용자가 말하고있는 상태 감지 코드 E
+
 // on page load runner
 $(function(){
     start();
@@ -220,7 +248,15 @@ function getMedia() {
 function getLocalMediaStream(mediaStream) {
     localStream = mediaStream;
     localVideo.srcObject = mediaStream;
-    localStream.getTracks().forEach(track => myPeerConnection.addTrack(track, localStream));
+    localStream.getTracks().forEach( track => {
+            // 마이크 사용중인지 체크하기 위해 추가 S
+            const microphoneSource = audioContext.createMediaStreamSource(mediaStream);
+            microphoneSource.connect(analyserNode);
+            // 마이크 사용중인지 체크하기 위해 추가 E
+
+            myPeerConnection.addTrack(track, localStream)
+        }
+    );
 }
 
 // handle get media error
@@ -394,7 +430,8 @@ exitButton.onclick = () => {
 sharingButtonOn.onclick = () => {
     localStream.getTracks().forEach(track => {track.stop();localStream.removeTrack(track);});
 
-    navigator.mediaDevices.getDisplayMedia(displayConstraints)
+    // 화면 공유와 함께 오디오 트랙 추가
+    navigator.mediaDevices.getDisplayMedia({...displayConstraints, audio: true})
         .then((mediaStream) => {
             localStream = mediaStream;
             localVideo.srcObject = mediaStream;
