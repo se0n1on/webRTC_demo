@@ -42,26 +42,29 @@ let videoFlag = true;
 let audioFlag = true;
 
 // 사용자가 말하고있는 상태 감지 코드 S
-const audioContext = new AudioContext();
-const analyserNode = audioContext.createAnalyser();
+const audioContext = new AudioContext();        // AudioContext : 사용자의 PC에서 기본 입력,출력장치로 설정한 하드웨어를 추적하여 이를 제어하는 인터페이스 제공
+const analyserNode = audioContext.createAnalyser(); // createAnalyser : AudioContext 객체의 주파수 데이터를 분석에 사용할 수 있는 객체를 생성
 analyserNode.fftSize = 2048;
 
-// get the frequency data from the AnalyserNode
+// 입력 장치에 입력된 주파수 정보를 기반으로 평균 볼륨을 계산하여 사용자가 말을 하고 있는 상태인지 점검
 function getFrequencyData() {
-    // create a new array of 8-bit integers (0-255)
-    const data = new Uint8Array(analyserNode.frequencyBinCount);
+    // 마이크가 꺼져있을때만 주파수 감지
+    if(audioFlag) {
+        // create a new array of 8-bit integers (0-255)
+        const data = new Uint8Array(analyserNode.frequencyBinCount);
 
-    // populate the array with the frequency data
-    analyserNode.getByteFrequencyData(data);
+        // populate the array with the frequency data
+        analyserNode.getByteFrequencyData(data);
 
-    // 마이크에 감지되는 평균 볼륨 계산
-    const averageVolume = data.reduce((acc, val) => acc + val) / data.length;
+        // 마이크에 감지되는 평균 볼륨 계산
+        const averageVolume = data.reduce((acc, val) => acc + val) / data.length;
 
-    // 일정 볼륨 이상으로 마이크 사용중인지 체크
-    if (averageVolume > 30) {
-        console.log("말하는중!");
-    } else {
-        console.log("말 안하고있음!");
+        // 일정 볼륨 이상으로 마이크 사용중인지 체크
+        if (averageVolume > 30) {
+            console.log("말하는중!");
+        } else {
+            console.log("말 안하고있음!");
+        }
     }
 }
 
@@ -475,31 +478,63 @@ function init() {
             e.preventDefault();
             const text = $(this).val();
 
+            // 첨부된 파일이 남아있을경우 전송
+            const file = $('div.input-div input[type=file]').get(0).files[0];
+
             // 메시지 전송
-            sendMessage(text);
+            sendMessage(text, file);
 
             // 입력창 clear
             clearTextarea();
+            clearFileInput();
         }
+    });
+
+    // 파일 첨부하면 바로 전송
+    $(document).on('change', 'div.input-div input[type=file]', function(e){
+        // 첨부파일 객체
+        const file = $('div.input-div input[type=file]').get(0).files[0];
+
+        // 용량 제한 체크
+        if (file && file.size > 200 * 1024 * 1024) { // 200MB 이상인 경우
+            alert("200MB 이하의 파일만 첨부 가능합니다.");
+            clearFileInput();
+            return;
+        }
+
+        // 메시지 전송
+        sendMessage('', file);
+
+        // 입력창 clear
+        clearTextarea();
+        clearFileInput();
     });
 }
 
 // 메세지 태그 생성
-function createMessageTag(LR_className, senderName, message) {
+function createMessageTag(LR_className, senderName, message, file) {
     // 형식 가져오기
     let chatLi = $('div.chat.format ul li').clone();
 
     // 값 채우기
     chatLi.addClass(LR_className);
     chatLi.find('.sender span').text(senderName);
-    chatLi.find('.message span').text(message);
+    chatLi.find('.message span').html(message.replace(/\n/g, '<br>'));
+
+    if (file) {
+        const fileTag = $('<a class="file-attachment"></a>');
+        fileTag.attr('href', URL.createObjectURL(file));
+        fileTag.attr('download', file.name); // 파일 다운로드 유도
+        fileTag.text(file.name + ' [' + (file.size / (1024 * 1024)).toFixed(2) + ' MB]');     // MB 단위로 첨부파일 용량 표시
+        chatLi.find('.message').append(fileTag);
+    }
 
     return chatLi;
 }
 
 // 메세지 태그 append
-function appendMessageTag(LR_className, senderName, message) {
-    const chatLi = createMessageTag(LR_className, senderName, message);
+function appendMessageTag(LR_className, senderName, message, file) {
+    const chatLi = createMessageTag(LR_className, senderName, message, file);
 
     $('div.chat:not(.format) ul').append(chatLi);
 
@@ -508,7 +543,7 @@ function appendMessageTag(LR_className, senderName, message) {
 }
 
 // 메세지 전송
-function sendMessage(text) {
+function sendMessage(text, file) {
     // 서버에 전송하는 코드로 후에 대체
     const data = `{"senderName":"${myName}", "message":"${text}"}`;
 
@@ -516,10 +551,11 @@ function sendMessage(text) {
     sendToServer({
         from: localUserName,
         type: "text",
-        data: data
+        data: data,
+        file: file
     });
 
-    appendMessageTag("right", myName, text);
+    appendMessageTag("right", myName, text, file);
 }
 
 // 메세지 입력박스 내용 지우기
@@ -527,8 +563,14 @@ function clearTextarea() {
     $('div.input-div textarea').val('');
 }
 
+// 파일 첨부 입력박스 지우기
+function clearFileInput() {
+    $('div.input-div input[type=file]').val('');
+}
+
 // 메세지 수신
 function receiveTextMessage(data) {
     let parsedData = JSON.parse(data);
-    appendMessageTag("left", parsedData.senderName, parsedData.message);
+    const message = parsedData.message.replace(/\n/g, '<br>');
+    appendMessageTag("left", parsedData.senderName, parsedData.message, parsedData.file);
 }
