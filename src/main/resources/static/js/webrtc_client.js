@@ -239,9 +239,9 @@ function handleTrackEvent(event) {
 // initialize media stream
 function getMedia() {
     // webRtc Stream 관련(https://geoboy.tistory.com/27) // (https://gh402.tistory.com/47) // (https://dreamfuture.tistory.com/60) - 화면 공유
-    localStream.getTracks().forEach(track => {
-        localStream.removeTrack(track)
-    });
+    if(localStream){
+        localStream.getTracks().forEach(track => {localStream.removeTrack(track)});
+    }
 
     navigator.mediaDevices.getUserMedia(userConstraints)
         .then(getLocalMediaStream).catch(handleGetUserMediaError);
