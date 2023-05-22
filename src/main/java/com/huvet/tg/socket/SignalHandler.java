@@ -62,7 +62,7 @@ public class SignalHandler extends TextWebSocketHandler {
         // webSocket has been opened, send a message to the client
         // when data field contains 'true' value, the client starts negotiating
         // to establish peer-to-peer connection, otherwise they wait for a counterpart
-        sendMessage(session, new WebSocketMessage("Server", MSG_TYPE_JOIN, Boolean.toString(!sessionIdToRoomMap.isEmpty()), null, null));
+        sendMessage(session, new WebSocketMessage("Server", MSG_TYPE_JOIN, Boolean.toString(!sessionIdToRoomMap.isEmpty()), null, null, null));
     }
 
     @Override
@@ -86,7 +86,8 @@ public class SignalHandler extends TextWebSocketHandler {
                                                 message.getType(),
                                                 data,
                                                 message.getCandidate(),
-                                                message.getSdp()));
+                                                message.getSdp(),
+                                                null));
                             }
                     }
                     break;
@@ -107,7 +108,8 @@ public class SignalHandler extends TextWebSocketHandler {
                                                 message.getType(),
                                                 data,
                                                 candidate,
-                                                sdp));
+                                                sdp,
+                                                null));
                             }
                         }
                     }

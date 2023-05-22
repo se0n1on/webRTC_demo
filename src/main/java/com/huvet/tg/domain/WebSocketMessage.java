@@ -8,6 +8,7 @@ public class WebSocketMessage {
     private String data;
     private Object candidate;
     private Object sdp;
+    private Object stream;
 
     public WebSocketMessage() {
     }
@@ -16,12 +17,14 @@ public class WebSocketMessage {
                             final String type,
                             final String data,
                             final Object candidate,
-                            final Object sdp) {
+                            final Object sdp,
+                            final Object stream) {
         this.from = from;
         this.type = type;
         this.data = data;
         this.candidate = candidate;
         this.sdp = sdp;
+        this.stream = stream;
     }
 
     public String getFrom() {
@@ -64,6 +67,14 @@ public class WebSocketMessage {
         this.sdp = sdp;
     }
 
+    public Object getStream() {
+        return stream;
+    }
+
+    public void setStream(final Object stream) {
+        this.stream = stream;
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) return true;
@@ -73,13 +84,14 @@ public class WebSocketMessage {
                 Objects.equals(getType(), message.getType()) &&
                 Objects.equals(getData(), message.getData()) &&
                 Objects.equals(getCandidate(), message.getCandidate()) &&
-                Objects.equals(getSdp(), message.getSdp());
+                Objects.equals(getSdp(), message.getSdp()) &&
+                Objects.equals(getStream(), message.getStream());
     }
 
     @Override
     public int hashCode() {
 
-        return Objects.hash(getFrom(), getType(), getData(), getCandidate(), getSdp());
+        return Objects.hash(getFrom(), getType(), getData(), getCandidate(), getSdp(), getStream());
     }
 
     @Override
@@ -90,6 +102,7 @@ public class WebSocketMessage {
                 ", data='" + data + '\'' +
                 ", candidate=" + candidate +
                 ", sdp=" + sdp +
+                ", stream=" + stream +
                 '}';
     }
 }

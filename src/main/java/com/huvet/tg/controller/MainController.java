@@ -45,14 +45,4 @@ public class MainController {
     public ModelAndView requestRandomRoomNumber(@ModelAttribute("uuid") final String uuid) {
         return mainService.requestRandomRoomNumber(uuid);
     }
-
-    @GetMapping("/offer")
-    public ModelAndView displaySampleSdpOffer() {
-        return new ModelAndView("sdp_offer");
-    }
-
-    @GetMapping("/stream")
-    public ModelAndView displaySampleStreaming() {
-        return new ModelAndView("streaming");
-    }
 }

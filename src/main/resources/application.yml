@@ -2,6 +2,11 @@
 spring:
   thymeleaf:
     cache: false
+  devtools:
+    livereload:
+      enabled: true
+    restart:
+      enabled: false
 
 server:
   ssl:

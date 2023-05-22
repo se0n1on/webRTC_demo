@@ -5,18 +5,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 @Service
 public class RoomService {    
     private final Parser parser;
     // repository substitution since this is a very simple realization
-    private final Set<Room> rooms = new TreeSet<>(Comparator.comparing(Room::getId));
+    private final Set<Room> rooms = new LinkedHashSet<Room>();
 
     @Autowired
     public RoomService(final Parser parser) {
@@ -24,10 +19,7 @@ public class RoomService {
     }
 
     public Set<Room> getRooms() {
-        final TreeSet<Room> defensiveCopy = new TreeSet<>(Comparator.comparing(Room::getId));
-        defensiveCopy.addAll(rooms);
-
-        return defensiveCopy;
+        return rooms;
     }
 
     public Boolean addRoom(final Room room) {

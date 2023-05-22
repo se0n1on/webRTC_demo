@@ -113,7 +113,7 @@ function start() {
                 break;
 
             case "join":
-                handlePeerConnection(message);
+                handlePeerConnection();
                 break;
 
             default:
@@ -196,12 +196,9 @@ function handleErrorMessage(message) {
 }
 
 // create peer connection, get media, start negotiating when second participant appears
-function handlePeerConnection(message) {
+function handlePeerConnection() {
     createPeerConnection();
     getMedia();
-    if (message.data === "true") {
-        myPeerConnection.onnegotiationneeded = handleNegotiationNeededEvent;
-    }
 }
 
 function createPeerConnection() {
@@ -210,13 +207,17 @@ function createPeerConnection() {
     // event handlers for the ICE negotiation process
     myPeerConnection.onicecandidate = handleICECandidateEvent;
     myPeerConnection.ontrack = handleTrackEvent;
-
+    myPeerConnection.onnegotiationneeded = handleNegotiationNeededEvent;
     // the following events are optional and could be realized later if needed
     // myPeerConnection.onremovetrack = handleRemoveTrackEvent;
     // myPeerConnection.oniceconnectionstatechange = handleICEConnectionStateChangeEvent;
     // myPeerConnection.onicegatheringstatechange = handleICEGatheringStateChangeEvent;
     // myPeerConnection.onsignalingstatechange = handleSignalingStateChangeEvent;
 }
+
+// function handleRemoveTrackEvent(event) {
+//     log(event);
+// }
 
 // send ICE candidate to the peer through the server
 function handleICECandidateEvent(event) {
@@ -238,11 +239,10 @@ function handleTrackEvent(event) {
 // initialize media stream
 function getMedia() {
     // webRtc Stream 관련(https://geoboy.tistory.com/27) // (https://gh402.tistory.com/47) // (https://dreamfuture.tistory.com/60) - 화면 공유
-    if (localStream) {
-        localStream.getTracks().forEach(track => {
-            localStream.removeTrack(track)
-        });
-    }
+    localStream.getTracks().forEach(track => {
+        localStream.removeTrack(track)
+    });
+
     navigator.mediaDevices.getUserMedia(userConstraints)
         .then(getLocalMediaStream).catch(handleGetUserMediaError);
 }
@@ -330,7 +330,6 @@ function handleOfferMessage(message) {
                     type: 'answer',
                     sdp: myPeerConnection.localDescription
                 });
-
             })
             // .catch(handleGetUserMediaError);
             .catch(handleErrorMessage)
@@ -430,41 +429,58 @@ exitButton.onclick = () => {
     stop();
 };
 
-sharingButtonOn.onclick = () => {
-    localStream.getTracks().forEach(track => {track.stop();localStream.removeTrack(track);});
+sharingButtonOn.onclick = async () => {
+    localStream.getTracks().forEach(track => {
+        track.stop();
+        localStream.removeTrack(track);
+        myPeerConnection.removeTrack(myPeerConnection.getSenders().find(sender => sender.track === track));
+    });
 
-    // 화면 공유와 함께 오디오 트랙 추가
-    navigator.mediaDevices.getDisplayMedia({...displayConstraints, audio: true})
-        .then((mediaStream) => {
-            localStream = mediaStream;
-            localVideo.srcObject = mediaStream;
-            localStream.getTracks().forEach(track => {
-                myPeerConnection.getSenders().find((sender) => sender.track.kind === track.kind).replaceTrack(track);
-            });
+    // 화면 공유 스트림 가져옴
+    const displayStream = await navigator.mediaDevices.getDisplayMedia(displayConstraints);
+    // 사용자의 audio 스트림만 가져옴
+    const userStream = await navigator.mediaDevices.getUserMedia({video: false, audio: true});
 
-        }).catch(handleGetUserMediaError);
+    // 두개의 스트림을 합침(화면공유 video/audio, 사용자 audio)
+    const combinedStream = new MediaStream([
+    ...displayStream.getVideoTracks(),
+    ...displayStream.getAudioTracks(),
+    ...userStream.getAudioTracks()
+    ]);
 
+    localStream = combinedStream;
+    localVideo.srcObject = combinedStream;
+    localStream.getTracks().forEach(track => {
+       myPeerConnection.addTrack(track, localStream);
+    });
+
+    // 원래 사용자의 설정대로(video는 무조건 보이도록)
     $(localVideo).css('display', 'inline');
-    localVideo.muted = false
+    localVideo.muted = !audioFlag;
 };
 
 sharingButtonOff.onclick = () => {
-    localStream.getTracks().forEach(track => {track.stop();localStream.removeTrack(track);});
+    localStream.getTracks().forEach(track => {
+        track.stop();
+        localStream.removeTrack(track);
+        myPeerConnection.removeTrack(myPeerConnection.getSenders().find(sender => sender.track === track));
+    });
 
+    // 사용자의 스트림을 가져옴
     navigator.mediaDevices.getUserMedia(userConstraints)
-        .then((mediaStream) => {
-            localStream = mediaStream;
-            localVideo.srcObject = mediaStream;
+        .then((userStream) => {
+            localStream = userStream;
+            localVideo.srcObject = userStream;
             localStream.getTracks().forEach(track => {
-                myPeerConnection.getSenders().find((sender) => sender.track.kind === track.kind).replaceTrack(track);
+                myPeerConnection.addTrack(track, localStream);
             });
         }).catch(handleGetUserMediaError);
 
-    if(videoFlag){
+    // 원래 사용자의 설정대로
+    if(videoFlag)
         $(localVideo).css('display', 'inline');
-    }else{
+    else
         $(localVideo).css('display', 'none');
-    }
     localVideo.muted = !audioFlag;
 };
 
