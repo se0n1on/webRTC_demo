@@ -123,7 +123,6 @@ function start() {
 
     socket.onopen = function() {
         log('WebSocket connection opened to Room: #' + localRoom);
-        // send a message to the server to join selected room with Web Socket
         sendToServer({
             from: localUserName,
             type: 'join',
@@ -162,13 +161,11 @@ function stop() {
         // myPeerConnection.onnotificationneeded = null;
         // myPeerConnection.onremovetrack = null;
 
-        // Stop the videos
-        if (remoteVideo.srcObject) {
+        // 비디오 트랙
+        if (remoteVideo.srcObject)
             remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-        }
-        if (localVideo.srcObject) {
+        if (localVideo.srcObject)
             localVideo.srcObject.getTracks().forEach(track => track.stop());
-        }
 
         remoteVideo.src = null;
         localVideo.src = null;
@@ -192,14 +189,17 @@ function handleErrorMessage(message) {
     console.error(message);
 }
 
+// 처음 join시 로컬 세팅
 function handlePeerConnection() {
     createPeerConnection();
     mediaSetting();
 }
 
 function createPeerConnection() {
+    // rtcPeerConnection 초기화
     myPeerConnection = new RTCPeerConnection(peerConnectionConfig);
 
+    // 이벤트 핸들러 등록
     myPeerConnection.onicecandidate = handleICECandidateEvent;
     myPeerConnection.ontrack = handleTrackEvent;
     myPeerConnection.onnegotiationneeded = handleNegotiationNeededEvent;
@@ -211,33 +211,14 @@ function createPeerConnection() {
     // myPeerConnection.onsignalingstatechange = handleSignalingStateChangeEvent;
 }
 
-// function handleRemoveTrackEvent(event) {
-//     log(event);
-// }
-
-function handleICECandidateEvent(event) {
-    if (event.candidate) {
-        sendToServer({
-            from: localUserName,
-            type: 'ice',
-            candidate: event.candidate
-        });
-        log('ICE Candidate Event: ICE candidate sent');
-    }
-}
-
-function handleTrackEvent(event) {
-    log('Track Event: set stream to remote video element');
-    remoteVideo.srcObject = event.streams[0];
-}
-
-// initialize media stream
+// 로컬 미디어 세팅 S
 function mediaSetting() {
     // webRtc Stream 관련(https://geoboy.tistory.com/27) // (https://gh402.tistory.com/47) // (https://dreamfuture.tistory.com/60) - 화면 공유
     if(localStream){
         localStream.getTracks().forEach(track => {localStream.removeTrack(track)});
     }
 
+    // 사용자의 카메라/마이크 가져옴
     navigator.mediaDevices.getUserMedia(userConstraints)
         .then(getLocalMediaStream).catch(handleGetUserMediaError);
 }
@@ -247,11 +228,11 @@ function getLocalMediaStream(mediaStream) {
     localStream = mediaStream;
     localVideo.srcObject = mediaStream;
     localStream.getTracks().forEach( track => {
-            // 마이크 사용중인지 체크하기 위해 추가 S
-            const microphoneSource = audioContext.createMediaStreamSource(mediaStream);
-            microphoneSource.connect(analyserNode);
-            // 마이크 사용중인지 체크하기 위해 추가 E
-            myPeerConnection.addTrack(track, localStream)
+        // 마이크 사용중인지 체크하기 위해 추가 S
+        const microphoneSource = audioContext.createMediaStreamSource(mediaStream);
+        microphoneSource.connect(analyserNode);
+        // 마이크 사용중인지 체크하기 위해 추가 E
+        myPeerConnection.addTrack(track, localStream)
     });
 }
 
@@ -273,11 +254,15 @@ function handleGetUserMediaError(error) {
     stop();
 }
 
+// 로컬 미디어 세팅 E
+
+// 다른 peer를 찾았을때 offer 전송
 function handleNegotiationNeededEvent() {
     myPeerConnection.createOffer().then(function(offer) {
         return myPeerConnection.setLocalDescription(offer);
     })
         .then(function() {
+            // offer 전송
             sendToServer({
                 from: localUserName,
                 type: 'offer',
@@ -286,11 +271,11 @@ function handleNegotiationNeededEvent() {
             log('Negotiation Needed Event: SDP offer sent');
         })
         .catch(function(reason) {
-            // 에러 처리
             handleErrorMessage('failure to connect error: ', reason);
         });
 }
 
+// offer 메시지 수신시(answer 전송)
 function handleOfferMessage(message) {
     log('Accepting Offer Message');
     let desc = new RTCSessionDescription(message.sdp);
@@ -314,6 +299,7 @@ function handleOfferMessage(message) {
             })
             .then(function () {
                 log("Sending answer packet back to other peer");
+                // answer 전송
                 sendToServer({
                     from: localUserName,
                     type: 'answer',
@@ -324,17 +310,38 @@ function handleOfferMessage(message) {
     }
 }
 
+// answer 메시지 수신시
 function handleAnswerMessage(message) {
     log("The peer has accepted request");
     myPeerConnection.setRemoteDescription(message.sdp).catch(handleErrorMessage);
 }
 
+// offer 및 answer가 끝난 후 ice 연결 시작
+function handleICECandidateEvent(event) {
+    if (event.candidate) {
+        sendToServer({
+            from: localUserName,
+            type: 'ice',
+            candidate: event.candidate
+        });
+        log('ICE Candidate Event: ICE candidate sent');
+    }
+}
+
+// ice 메시지 수신시
 function handleNewICECandidateMessage(message) {
     let candidate = new RTCIceCandidate(message.candidate);
     log("Adding received ICE candidate: " + JSON.stringify(candidate));
     myPeerConnection.addIceCandidate(candidate).catch(handleErrorMessage);
 }
 
+// rtcPeerConnection에 트랙이 등록되었을때
+function handleTrackEvent(event) {
+    log('Track Event: set stream to remote video element');
+    remoteVideo.srcObject = event.streams[0];
+}
+
+// stream 관련 핸들러
 function handleStreamMessage(message) {
     switch (message.type){
         case "videoStreamOn":
@@ -358,7 +365,7 @@ function handleStreamMessage(message) {
     }
 }
 
-// 서버로 json 전송
+// 서버로 스켓 메시지 전송
 function sendToServer(msg) {
     let msgJSON = JSON.stringify(msg);
     socket.send(msgJSON);
@@ -488,7 +495,6 @@ sharingButtonOff.onclick = () => {
     });
 };
 
-
 // 방 나가기
 exitButton.onclick = () => {
     stop();
@@ -594,7 +600,7 @@ function appendMessageTag(LR_className, senderName, message, file) {
     $('div.chat').scrollTop($('div.chat').prop('scrollHeight'));
 }
 
-// 메세지 전송
+// 채팅 메세지 전송
 function sendMessage(text, file) {
     // 서버에 전송하는 코드로 후에 대체
     const data = `{"senderName":"${myName}", "message":"${text}"}`;
