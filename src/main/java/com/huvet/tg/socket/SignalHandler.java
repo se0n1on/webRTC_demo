@@ -51,6 +51,10 @@ public class SignalHandler extends TextWebSocketHandler {
 
     private static final String MSG_TYPE_AUDIO_STREAM_OFF = "audioStreamOff";
 
+    private static final String MSG_TYPE_SHARE_STREAM_ON = "shareStreamOn";
+
+    private static final String MSG_TYPE_SHARE_STREAM_OFF = "shareStreamOff";
+
     @Override
     public void afterConnectionClosed(final WebSocketSession session, final CloseStatus status) {
         logger.debug("[ws] Session has been closed with status {}", status);
@@ -75,7 +79,7 @@ public class SignalHandler extends TextWebSocketHandler {
             final Room room = sessionIdToRoomMap.get(session.getId());
             switch (message.getType()) {
                 // stream status
-                case MSG_TYPE_VIDEO_STREAM_ON: case MSG_TYPE_VIDEO_STREAM_OFF: case MSG_TYPE_AUDIO_STREAM_ON: case MSG_TYPE_AUDIO_STREAM_OFF: case MSG_TYPE_TEXT:
+                case MSG_TYPE_VIDEO_STREAM_ON: case MSG_TYPE_VIDEO_STREAM_OFF: case MSG_TYPE_AUDIO_STREAM_ON: case MSG_TYPE_AUDIO_STREAM_OFF: case MSG_TYPE_SHARE_STREAM_ON: case MSG_TYPE_SHARE_STREAM_OFF: case MSG_TYPE_TEXT:
                     logger.debug("[ws] Stream or Text: {}",message.getData());
                     if (room != null) {
                         Map<String, WebSocketSession> clients = roomService.getClients(room);

@@ -1,8 +1,8 @@
 'use strict';
-// create and run Web Socket connection
+// 소켓 연결
 const socket = new WebSocket("wss://" + location.host + "/signal");
 
-// UI elements
+// UI 요소 가져옴
 const videoButtonOff = document.querySelector('#video_off');
 const videoButtonOn = document.querySelector('#video_on');
 const audioButtonOff = document.querySelector('#audio_off');
@@ -15,7 +15,8 @@ const localVideo = document.getElementById('local_video');
 const remoteVideo = document.getElementById('remote_video');
 const localUserName = localStorage.getItem("uuid");
 let myName = document.getElementById("userName").value;
-// WebRTC STUN servers
+
+// WebRTC STUN 서버
 const peerConnectionConfig = {
     'iceServers': [
         {'urls': 'stun:stun.stunprotocol.org:3478'},
@@ -35,11 +36,12 @@ const displayConstraints = {
     video: true
 };
 
-// WebRTC variables
+// WebRTC 변수
 let localStream;
 let myPeerConnection;
 let videoFlag = true;
 let audioFlag = true;
+let remoteShareFlag = false;
 
 // 사용자가 말하고있는 상태 감지 코드 S
 const audioContext = new AudioContext();        // AudioContext : 사용자의 PC에서 기본 입력,출력장치로 설정한 하드웨어를 추적하여 이를 제어하는 인터페이스 제공
@@ -72,47 +74,45 @@ function getFrequencyData() {
 setInterval(getFrequencyData, 50);
 // 사용자가 말하고있는 상태 감지 코드 E
 
-// on page load runner
 $(function(){
     start();
     init();
 });
 
 function start() {
-    // add an event listener for a message being received
     socket.onmessage = function(msg) {
         let message = JSON.parse(msg.data);
-        switch (message.type) {
-            case "videoStreamOn": case "videoStreamOff": case "audioStreamOn": case "audioStreamOff":
+        switch (true) {
+            case message.type.includes("Stream"):
                 if(message.from !== localUserName){
                     log('Stream message recieved')
                     handleStreamMessage(message);
                 }
                 break;
 
-            case "text":
+            case message.type === "text":
                 if(message.from !== localUserName){
                     log('text message recieved')
                     receiveTextMessage(message.data);
                 }
                 break;
 
-            case "offer":
+            case message.type === "offer":
                 log('Signal OFFER received');
                 handleOfferMessage(message);
                 break;
 
-            case "answer":
+            case message.type === "answer":
                 log('Signal ANSWER received');
                 handleAnswerMessage(message);
                 break;
 
-            case "ice":
+            case message.type === "ice":
                 log('Signal ICE Candidate received');
                 handleNewICECandidateMessage(message);
                 break;
 
-            case "join":
+            case message.type === "join":
                 handlePeerConnection();
                 break;
 
@@ -121,7 +121,6 @@ function start() {
         }
     };
 
-    // add an event listener to get to know when a connection is open
     socket.onopen = function() {
         log('WebSocket connection opened to Room: #' + localRoom);
         // send a message to the server to join selected room with Web Socket
@@ -132,19 +131,16 @@ function start() {
         });
     };
 
-    // a listener for the socket being closed event
     socket.onclose = function(message) {
         log('Socket has been closed');
     };
 
-    // an event listener to handle socket errors
     socket.onerror = function(message) {
         handleErrorMessage("Error: " + message);
     };
 }
 
 function stop() {
-    // send a message to the server to remove this client from the room clients list
     log("Send 'leave' message to server");
     sendToServer({
         from: localUserName,
@@ -155,15 +151,16 @@ function stop() {
     if (myPeerConnection) {
         log('Close the RTCPeerConnection');
 
-        // disconnect all our event listeners
         myPeerConnection.onicecandidate = null;
         myPeerConnection.ontrack = null;
         myPeerConnection.onnegotiationneeded = null;
-        myPeerConnection.oniceconnectionstatechange = null;
-        myPeerConnection.onsignalingstatechange = null;
-        myPeerConnection.onicegatheringstatechange = null;
-        myPeerConnection.onnotificationneeded = null;
-        myPeerConnection.onremovetrack = null;
+
+        // 필요할시 사용
+        // myPeerConnection.oniceconnectionstatechange = null;
+        // myPeerConnection.onsignalingstatechange = null;
+        // myPeerConnection.onicegatheringstatechange = null;
+        // myPeerConnection.onnotificationneeded = null;
+        // myPeerConnection.onremovetrack = null;
 
         // Stop the videos
         if (remoteVideo.srcObject) {
@@ -195,20 +192,19 @@ function handleErrorMessage(message) {
     console.error(message);
 }
 
-// create peer connection, get media, start negotiating when second participant appears
 function handlePeerConnection() {
     createPeerConnection();
-    getMedia();
+    mediaSetting();
 }
 
 function createPeerConnection() {
     myPeerConnection = new RTCPeerConnection(peerConnectionConfig);
 
-    // event handlers for the ICE negotiation process
     myPeerConnection.onicecandidate = handleICECandidateEvent;
     myPeerConnection.ontrack = handleTrackEvent;
     myPeerConnection.onnegotiationneeded = handleNegotiationNeededEvent;
-    // the following events are optional and could be realized later if needed
+
+    // 필요할시 사용
     // myPeerConnection.onremovetrack = handleRemoveTrackEvent;
     // myPeerConnection.oniceconnectionstatechange = handleICEConnectionStateChangeEvent;
     // myPeerConnection.onicegatheringstatechange = handleICEGatheringStateChangeEvent;
@@ -219,7 +215,6 @@ function createPeerConnection() {
 //     log(event);
 // }
 
-// send ICE candidate to the peer through the server
 function handleICECandidateEvent(event) {
     if (event.candidate) {
         sendToServer({
@@ -237,7 +232,7 @@ function handleTrackEvent(event) {
 }
 
 // initialize media stream
-function getMedia() {
+function mediaSetting() {
     // webRtc Stream 관련(https://geoboy.tistory.com/27) // (https://gh402.tistory.com/47) // (https://dreamfuture.tistory.com/60) - 화면 공유
     if(localStream){
         localStream.getTracks().forEach(track => {localStream.removeTrack(track)});
@@ -256,10 +251,8 @@ function getLocalMediaStream(mediaStream) {
             const microphoneSource = audioContext.createMediaStreamSource(mediaStream);
             microphoneSource.connect(analyserNode);
             // 마이크 사용중인지 체크하기 위해 추가 E
-
             myPeerConnection.addTrack(track, localStream)
-        }
-    );
+    });
 }
 
 // handle get media error
@@ -280,10 +273,6 @@ function handleGetUserMediaError(error) {
     stop();
 }
 
-// WebRTC called handler to begin ICE negotiation
-// 1. create a WebRTC offer
-// 2. set local media description
-// 3. send the description as an offer on media format, resolution, etc
 function handleNegotiationNeededEvent() {
     myPeerConnection.createOffer().then(function(offer) {
         return myPeerConnection.setLocalDescription(offer);
@@ -297,7 +286,7 @@ function handleNegotiationNeededEvent() {
             log('Negotiation Needed Event: SDP offer sent');
         })
         .catch(function(reason) {
-            // an error occurred, so handle the failure to connect
+            // 에러 처리
             handleErrorMessage('failure to connect error: ', reason);
         });
 }
@@ -331,17 +320,12 @@ function handleOfferMessage(message) {
                     sdp: myPeerConnection.localDescription
                 });
             })
-            // .catch(handleGetUserMediaError);
             .catch(handleErrorMessage)
     }
 }
 
 function handleAnswerMessage(message) {
     log("The peer has accepted request");
-
-    // Configure the remote description, which is the SDP payload
-    // in our "video-answer" message.
-    // myPeerConnection.setRemoteDescription(new RTCSessionDescription(message.sdp)).catch(handleErrorMessage);
     myPeerConnection.setRemoteDescription(message.sdp).catch(handleErrorMessage);
 }
 
@@ -360,24 +344,30 @@ function handleStreamMessage(message) {
             $(remoteVideo).css('display', 'none');
             break;
         case "audioStreamOn":
-            remoteVideo.muted = false
+            remoteVideo.muted = false;
             break;
         case "audioStreamOff":
-            remoteVideo.muted = true
+            remoteVideo.muted = true;
+            break;
+        case "shareStreamOn":
+            remoteShareFlag = true;
+            break;
+        case "shareStreamOff":
+            remoteShareFlag = false;
             break;
     }
 }
 
-// use JSON format to send WebSocket message
+// 서버로 json 전송
 function sendToServer(msg) {
     let msgJSON = JSON.stringify(msg);
     socket.send(msgJSON);
 }
 
 /*
- UI Handlers
+ UI 핸들러
   */
-// mute video buttons handler
+// 카메라 off
 videoButtonOff.onclick = () => {
     videoFlag = false;
     // localStream.getVideoTracks().forEach(track => {track.stop();localStream.removeTrack(track);});
@@ -389,6 +379,8 @@ videoButtonOff.onclick = () => {
         data: localRoom
     });
 };
+
+// 카메라 on
 videoButtonOn.onclick = () => {
     videoFlag = true;
     // localStream.getVideoTracks().forEach(track => {localStream.addTrack(track);});
@@ -401,7 +393,7 @@ videoButtonOn.onclick = () => {
     });
 };
 
-// mute audio buttons handler
+// 마이크 음소거
 audioButtonOff.onclick = () => {
     audioFlag = false;
     localVideo.muted = true;
@@ -413,6 +405,7 @@ audioButtonOff.onclick = () => {
     });
 };
 
+// 마이크 킴
 audioButtonOn.onclick = () => {
     audioFlag = true;
     localVideo.muted = false;
@@ -424,11 +417,7 @@ audioButtonOn.onclick = () => {
     });
 };
 
-// room exit button handler
-exitButton.onclick = () => {
-    stop();
-};
-
+// 화면 공유 활성화
 sharingButtonOn.onclick = async () => {
     localStream.getTracks().forEach(track => {
         track.stop();
@@ -457,8 +446,16 @@ sharingButtonOn.onclick = async () => {
     // 원래 사용자의 설정대로(video는 무조건 보이도록)
     $(localVideo).css('display', 'inline');
     localVideo.muted = !audioFlag;
+
+    // 상대방에게 화면공유 활성화를 알림
+    sendToServer({
+        from: localUserName,
+        type: 'shareStreamOn',
+        data: localRoom
+    });
 };
 
+// 화면 공유 비활성화
 sharingButtonOff.onclick = () => {
     localStream.getTracks().forEach(track => {
         track.stop();
@@ -482,6 +479,19 @@ sharingButtonOff.onclick = () => {
     else
         $(localVideo).css('display', 'none');
     localVideo.muted = !audioFlag;
+
+    // 상대방에게 화면공유 비활성화를 알림
+    sendToServer({
+        from: localUserName,
+        type: 'shareStreamOff',
+        data: localRoom
+    });
+};
+
+
+// 방 나가기
+exitButton.onclick = () => {
+    stop();
 };
 
 ////////// 채팅 //////////
