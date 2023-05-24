@@ -17,7 +17,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public class MainServiceImpl implements MainService {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private static final String REDIRECT = "redirect:/";
-    
     private final RoomService roomService;
     private final Parser parser;
 

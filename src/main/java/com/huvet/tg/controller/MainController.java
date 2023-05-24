@@ -14,12 +14,7 @@ import org.springframework.web.servlet.ModelAndView;
 @Controller
 @ControllerAdvice
 public class MainController {    
-    private final MainService mainService;
-    
-    @Autowired
-    public MainController(final MainService mainService) {
-        this.mainService = mainService;
-    }
+    @Autowired private MainService mainService;
 
     @GetMapping({"", "/", "/index", "/home", "/main"})
     public ModelAndView displayMainPage(final Long id, final String uuid) {

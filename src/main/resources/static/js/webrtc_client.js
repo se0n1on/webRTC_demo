@@ -1,7 +1,5 @@
 'use strict';
 
-let socket
-
 // UI 요소 가져옴
 const videoButtonOff = document.querySelector('#video_off');
 const videoButtonOn = document.querySelector('#video_on');
@@ -37,6 +35,7 @@ const displayConstraints = {
 };
 
 // WebRTC 변수
+let socket
 let localStream;
 let myPeerConnection;
 let videoFlag = true;
@@ -80,7 +79,6 @@ $(function(){
 });
 
 function start() {
-    // 변경
     // 소켓 연결
     socket = new WebSocket("wss://" + location.host + "/signal");
     socket.binaryType = 'arraybuffer';
@@ -122,10 +120,10 @@ function start() {
                     handlePeerConnection();
                     break;
 
-                // 변경
                 case message.type === "leave":
                     handlePeerLeave();
                     break;
+
                 default:
                     handleErrorMessage('Wrong type message received from server');
             }
@@ -145,14 +143,12 @@ function start() {
         });
     };
 
-    // 변경
     setTimeout(() => {
 			if (socket.readyState !== 1) {
 				log("socket abnormal close. reconnect.");
 			}
 		}, 3000);
 
-    // 변경
     socket.onclose = function(event) {
         if (event.code === 1009){
             log(`socket buffer error(code=${event.code})`);
@@ -199,7 +195,6 @@ function stop() {
         if (localVideo.srcObject)
             localVideo.srcObject.getTracks().forEach(track => track.stop());
 
-        // 변경
         remoteVideo.srcObject = null;
         localVideo.srcObject = null;
 
@@ -317,17 +312,10 @@ function handleOfferMessage(message) {
         log('RTC Signalling state: ' + myPeerConnection.signalingState);
         myPeerConnection.setRemoteDescription(desc).then(function () {
                 log("-- Creating answer");
-                // Now that we've successfully set the remote description, we need to
-                // start our stream up locally then create an SDP answer. This SDP
-                // data describes the local end of our call, including the codec
-                // information, options agreed upon, and so forth.
                 return myPeerConnection.createAnswer();
             })
             .then(function (answer) {
                 log("-- Setting local description after creating answer");
-                // We now have our answer, so establish that as the local description.
-                // This actually configures our end of the call to match the settings
-                // specified in the SDP.
                 return myPeerConnection.setLocalDescription(answer);
             })
             .then(function () {

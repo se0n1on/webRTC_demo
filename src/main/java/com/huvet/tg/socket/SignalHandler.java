@@ -19,41 +19,11 @@ import java.util.*;
 
 @Component
 public class SignalHandler extends TextWebSocketHandler {
-    @Autowired private RoomService roomService;
 
+    @Autowired private RoomService roomService;
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // session id to room mapping
     private Map<String, Room> sessionIdToRoomMap = new HashMap<>();
-
-    // message types, used in signalling:
-    // text message
-    private static final String MSG_TYPE_TEXT = "text";
-    // file message
-    private static final String MSG_TYPE_FILE = "file";
-    // SDP Offer message
-    private static final String MSG_TYPE_OFFER = "offer";
-    // SDP Answer message
-    private static final String MSG_TYPE_ANSWER = "answer";
-    // New ICE Candidate message
-    private static final String MSG_TYPE_ICE = "ice";
-    // join room data message
-    private static final String MSG_TYPE_JOIN = "join";
-    // leave room data message
-    private static final String MSG_TYPE_LEAVE = "leave";
-
-    private static final String MSG_TYPE_VIDEO_STREAM_ON = "videoStreamOn";
-
-    private static final String MSG_TYPE_VIDEO_STREAM_OFF = "videoStreamOff";
-
-    private static final String MSG_TYPE_AUDIO_STREAM_ON = "audioStreamOn";
-
-    private static final String MSG_TYPE_AUDIO_STREAM_OFF = "audioStreamOff";
-
-    private static final String MSG_TYPE_SHARE_STREAM_ON = "shareStreamOn";
-
-    private static final String MSG_TYPE_SHARE_STREAM_OFF = "shareStreamOff";
 
     @Override
     public void afterConnectionClosed(final WebSocketSession session, final CloseStatus status) {
@@ -69,10 +39,7 @@ public class SignalHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(final WebSocketSession session) {
-        // webSocket has been opened, send a message to the client
-        // when data field contains 'true' value, the client starts negotiating
-        // to establish peer-to-peer connection, otherwise they wait for a counterpart
-        sendMessage(session, new WebSocketMessage("Server", MSG_TYPE_JOIN, null, null, null));
+        sendMessage(session, new WebSocketMessage("Server", "join", null, null, null));
     }
 
     @Override
@@ -80,13 +47,13 @@ public class SignalHandler extends TextWebSocketHandler {
         // a message has been received
         try {
             WebSocketMessage message = objectMapper.readValue(textMessage.getPayload(), WebSocketMessage.class);
-            String userName = message.getFrom(); // origin of the message
-            String data = message.getData(); // payload
+            String userName = message.getFrom();
+            String data = message.getData();
             final Room room = sessionIdToRoomMap.get(session.getId());
             switch (message.getType()) {
-                // stream status
-                case MSG_TYPE_VIDEO_STREAM_ON: case MSG_TYPE_VIDEO_STREAM_OFF: case MSG_TYPE_AUDIO_STREAM_ON: case MSG_TYPE_AUDIO_STREAM_OFF: case MSG_TYPE_SHARE_STREAM_ON: case MSG_TYPE_SHARE_STREAM_OFF: case MSG_TYPE_TEXT: case MSG_TYPE_FILE:
-                    logger.debug("[ws] Stream or Text or File: {}",data);
+
+                case "videoStreamOn": case "videoStreamOff": case "audioStreamOn": case "audioStreamOff": case "shareStreamOn": case "shareStreamOff": case "text":
+                    logger.debug("[ws] Stream or Text: {}",data);
                     if (room != null) {
                         Map<String, WebSocketSession> clients = roomService.getClients(room);
                         for(Map.Entry<String, WebSocketSession> client : clients.entrySet()) {
@@ -103,10 +70,8 @@ public class SignalHandler extends TextWebSocketHandler {
                     }
                     break;
 
-                case MSG_TYPE_OFFER: case MSG_TYPE_ANSWER: case MSG_TYPE_ICE:
+                case "offer": case "answer": case "ice":
                     logger.debug("[ws] type {} message received", message.getType());
-                    Object candidate = message.getCandidate();
-                    Object sdp = message.getSdp();
                     if (room != null) {
                         Map<String, WebSocketSession> clients = roomService.getClients(room);
                         for(Map.Entry<String, WebSocketSession> client : clients.entrySet())  {
@@ -116,26 +81,23 @@ public class SignalHandler extends TextWebSocketHandler {
                                                 userName,
                                                 message.getType(),
                                                 data,
-                                                candidate,
-                                                sdp));
+                                                message.getCandidate(),
+                                                message.getSdp()));
                             }
                         }
                     }
                     break;
 
-                // identify user and their opponent
-                case MSG_TYPE_JOIN:
-                    // message.data contains connected room id
+                case "join":
                     logger.debug("[ws] {} has joined Room: #{}", userName, data);
                     Room firstRoom = roomService.findRoomByStringId(data)
                             .orElseThrow(() -> new IOException("Invalid room number received!"));
-                    // add client to the Room clients list
                     roomService.addClient(firstRoom, userName, session);
                     sessionIdToRoomMap.put(session.getId(), firstRoom);
                     break;
 
-                case MSG_TYPE_LEAVE:
-                    logger.debug("[ws] {} is going to leave Room: #{}", userName, data);
+                case "leave":
+                    logger.debug("[ws] {} has leaved Room: #{}", userName, data);
                     if (room != null) {
                         Map<String, WebSocketSession> clients = roomService.getClients(room);
                         for(Map.Entry<String, WebSocketSession> client : clients.entrySet()) {
@@ -159,10 +121,8 @@ public class SignalHandler extends TextWebSocketHandler {
                     sessionIdToRoomMap.remove(session.getId());
                     break;
 
-                // something should be wrong with the received message, since it's type is unrecognizable
                 default:
-                    logger.debug("[ws] Type of the received message {} is undefined!", message.getType());
-                    // handle this if needed
+                    logger.debug("Wrong type message received from server");
             }
 
         } catch (IOException e) {

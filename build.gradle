@@ -19,7 +19,6 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 apply plugin: 'org.springframework.boot'
 apply plugin: 'io.spring.dependency-management'
-//apply plugin: 'com.palantir.docker'
 apply plugin: "org.sonarqube"
 
 group = 'com.huvet.tg'
@@ -53,11 +52,3 @@ task unpack(type: Copy) {
 	from(zipTree("build/libs/${bootJar.archiveName}"))
 	into("build/dependency")
 }
-
-//docker {
-//	name "benkoff/${bootJar.baseName}"
-//	tags 'latest'
-//	dockerfile file('Dockerfile')
-//	copySpec.from(tasks.unpack.outputs).into("dependency")
-//	buildArgs(['DEPENDENCY': "dependency"])
-//}
