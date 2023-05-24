@@ -1,6 +1,6 @@
 'use strict';
-// 소켓 연결
-const socket = new WebSocket("wss://" + location.host + "/signal");
+
+let socket
 
 // UI 요소 가져옴
 const videoButtonOff = document.querySelector('#video_off');
@@ -80,45 +80,60 @@ $(function(){
 });
 
 function start() {
+    // 변경
+    // 소켓 연결
+    socket = new WebSocket("wss://" + location.host + "/signal");
+    socket.binaryType = 'arraybuffer';
+
     socket.onmessage = function(msg) {
-        let message = JSON.parse(msg.data);
-        switch (true) {
-            case message.type.includes("Stream"):
-                if(message.from !== localUserName){
-                    log('Stream message recieved')
-                    handleStreamMessage(message);
-                }
-                break;
+        if(typeof msg.data === "string"){
+            let message = JSON.parse(msg.data);
+            switch (true) {
+                case message.type.includes("Stream"):
+                    if(message.from !== localUserName){
+                        log('Stream message recieved')
+                        handleStreamMessage(message);
+                    }
+                    break;
 
-            case message.type === "text":
-                if(message.from !== localUserName){
-                    log('text message recieved')
-                    receiveTextMessage(message.data);
-                }
-                break;
+                case message.type === "text":
+                    if(message.from !== localUserName){
+                        log('text message recieved')
+                        receiveTextMessage(message.data);
+                    }
+                    break;
 
-            case message.type === "offer":
-                log('Signal OFFER received');
-                handleOfferMessage(message);
-                break;
+                case message.type === "offer":
+                    log('Signal OFFER received');
+                    handleOfferMessage(message);
+                    break;
 
-            case message.type === "answer":
-                log('Signal ANSWER received');
-                handleAnswerMessage(message);
-                break;
+                case message.type === "answer":
+                    log('Signal ANSWER received');
+                    handleAnswerMessage(message);
+                    break;
 
-            case message.type === "ice":
-                log('Signal ICE Candidate received');
-                handleNewICECandidateMessage(message);
-                break;
+                case message.type === "ice":
+                    log('Signal ICE Candidate received');
+                    handleNewICECandidateMessage(message);
+                    break;
 
-            case message.type === "join":
-                handlePeerConnection();
-                break;
+                case message.type === "join":
+                    handlePeerConnection();
+                    break;
 
-            default:
-                handleErrorMessage('Wrong type message received from server');
+                // 변경
+                case message.type === "leave":
+                    handlePeerLeave();
+                    break;
+                default:
+                    handleErrorMessage('Wrong type message received from server');
+            }
+        }else{
+            log(msg.data instanceof ArrayBuffer);
+            receiveFileMessage(msg.data)
         }
+
     };
 
     socket.onopen = function() {
@@ -130,8 +145,25 @@ function start() {
         });
     };
 
-    socket.onclose = function(message) {
-        log('Socket has been closed');
+    // 변경
+    setTimeout(() => {
+			if (socket.readyState !== 1) {
+				log("socket abnormal close. reconnect.");
+			}
+		}, 3000);
+
+    // 변경
+    socket.onclose = function(event) {
+        if (event.code === 1009){
+            log(`socket buffer error(code=${event.code})`);
+            start();
+        }else if (event.code === 1006) {
+            log(`socket server error(code=${event.code})`);
+            start();
+        }
+        else {
+            log(`socket close state(code=${event.code})`);
+        }
     };
 
     socket.onerror = function(message) {
@@ -167,8 +199,9 @@ function stop() {
         if (localVideo.srcObject)
             localVideo.srcObject.getTracks().forEach(track => track.stop());
 
-        remoteVideo.src = null;
-        localVideo.src = null;
+        // 변경
+        remoteVideo.srcObject = null;
+        localVideo.srcObject = null;
 
         // close the peer connection
         myPeerConnection.close();
@@ -444,6 +477,43 @@ sharingButtonOn.onclick = async () => {
     ...userStream.getAudioTracks()
     ]);
 
+    // 브라우저 공유 중지 버튼을 눌렀을때 화면 공유 off
+    // 변경
+    combinedStream.getVideoTracks()[0].onended = function () {
+        //Jquery trigger
+        $(sharingButtonOff).trigger("click");
+
+        localStream.getTracks().forEach(track => {
+            track.stop();
+            localStream.removeTrack(track);
+            myPeerConnection.removeTrack(myPeerConnection.getSenders().find(sender => sender.track === track));
+        });
+
+        // 사용자의 스트림을 가져옴
+        navigator.mediaDevices.getUserMedia(userConstraints)
+            .then((userStream) => {
+                localStream = userStream;
+                localVideo.srcObject = userStream;
+                localStream.getTracks().forEach(track => {
+                    myPeerConnection.addTrack(track, localStream);
+                });
+            }).catch(handleGetUserMediaError);
+
+        // 원래 사용자의 설정대로
+        if(videoFlag)
+            $(localVideo).css('display', 'inline');
+        else
+            $(localVideo).css('display', 'none');
+        localVideo.muted = !audioFlag;
+
+        // 상대방에게 화면공유 비활성화를 알림
+        sendToServer({
+            from: localUserName,
+            type: 'shareStreamOff',
+            data: localRoom
+        });
+    }
+
     localStream = combinedStream;
     localVideo.srcObject = combinedStream;
     localStream.getTracks().forEach(track => {
@@ -495,6 +565,12 @@ sharingButtonOff.onclick = () => {
     });
 };
 
+// 변경
+// 상대방이 방을 나갔을때
+function handlePeerLeave() {
+    remoteVideo.srcObject = null;
+}
+
 // 방 나가기
 exitButton.onclick = () => {
     stop();
@@ -510,11 +586,8 @@ function init() {
             e.preventDefault();
             const text = $(this).val();
 
-            // 첨부된 파일이 남아있을경우 전송 div.input-div input[type=file] : 실제 화면에서 사용하는 정보로 수정 필요
-            const file = $('div.input-div input[type=file]').get(0).files[0];
-
             // 메시지 전송
-            sendMessage(text, file);
+            sendMessage(text);
 
             // 입력창 clear
             clearTextarea();
@@ -535,7 +608,7 @@ function init() {
         }
 
         // 메시지 전송
-        sendMessage('', file);
+        sendFile(file);
 
         // 입력창 clear
         clearTextarea();
@@ -565,7 +638,7 @@ function init() {
         }
 
         // 메시지 전송
-        sendMessage('', file);
+        sendFile(file);
     });
 }
 
@@ -577,7 +650,7 @@ function createMessageTag(LR_className, senderName, message, file) {
     // 값 채우기
     chatLi.addClass(LR_className);
     chatLi.find('.sender span').text(senderName);
-    chatLi.find('.message span').html(message.replace(/\n/g, '<br>'));
+    chatLi.find('.message span').html(message);
 
     if (file) {
         const fileTag = $('<a class="file-attachment"></a>');
@@ -601,7 +674,7 @@ function appendMessageTag(LR_className, senderName, message, file) {
 }
 
 // 채팅 메세지 전송
-function sendMessage(text, file) {
+function sendMessage(text) {
     // 서버에 전송하는 코드로 후에 대체
     const data = `{"senderName":"${myName}", "message":"${text}"}`;
 
@@ -609,11 +682,27 @@ function sendMessage(text, file) {
     sendToServer({
         from: localUserName,
         type: "text",
-        data: data,
-        file: file
+        data: data
     });
 
-    appendMessageTag("right", myName, text, file);
+    appendMessageTag("right", myName, text, null);
+}
+
+// 파일 메시지 전송
+function sendFile(file) {
+    let fileName = file.name;// 파일의 이름
+    let reader = new FileReader();
+    reader.readAsArrayBuffer(file);// file을 ArrayBuffer로 읽어옴
+    let rawData = new ArrayBuffer();// 버퍼사이즈 만큼 데이터를 저장할 rawData 설정
+
+    // 파일을 읽으면 요청되는 이벤트
+    reader.onload = function(e){
+        rawData = e.target.result;
+        log(rawData);
+        socket.send(new Uint8Array(rawData));
+    }
+
+    appendMessageTag("right", myName, null, file);
 }
 
 // 메세지 입력박스 내용 지우기
@@ -630,5 +719,14 @@ function clearFileInput() {
 function receiveTextMessage(data) {
     let parsedData = JSON.parse(data);
     const message = parsedData.message.replace(/\n/g, '<br>');
-    appendMessageTag("left", parsedData.senderName, parsedData.message, parsedData.file);
+    appendMessageTag("left", parsedData.senderName, message, null);
+}
+
+// 파일 수신
+function receiveFileMessage(buffer) {
+    log(buffer);
+    let blob = new Blob([buffer], {type: "application/pdf"});
+    let file = new File([blob], "test.pdf");
+
+    appendMessageTag("left", "test", null, file);
 }
