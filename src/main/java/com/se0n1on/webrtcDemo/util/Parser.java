@@ -1,4 +1,4 @@
-package com.huvet.tg.util;
+package com.se0n1on.webrtcDemo.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

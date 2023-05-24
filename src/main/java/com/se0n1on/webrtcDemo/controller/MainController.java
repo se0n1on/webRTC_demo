@@ -1,6 +1,6 @@
-package com.huvet.tg.controller;
+package com.se0n1on.webrtcDemo.controller;
 
-import com.huvet.tg.service.MainService;
+import com.se0n1on.webrtcDemo.service.MainService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;

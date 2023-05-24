@@ -1,6 +1,6 @@
-package com.huvet.tg.domain;
+package com.se0n1on.webrtcDemo.domain;
 
-import com.huvet.tg.util.Parser;
+import com.se0n1on.webrtcDemo.util.Parser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.WebSocketSession;

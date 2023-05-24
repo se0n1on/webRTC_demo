@@ -42,7 +42,8 @@ let videoFlag = true;
 let audioFlag = true;
 let remoteShareFlag = false;
 
-// 사용자가 말하고있는 상태 감지 코드 S
+// 사용자가 말하고있는 상태 감지 코드 S( 구현 완료 안됨 )
+
 const audioContext = new AudioContext();        // AudioContext : 사용자의 PC에서 기본 입력,출력장치로 설정한 하드웨어를 추적하여 이를 제어하는 인터페이스 제공
 const analyserNode = audioContext.createAnalyser(); // createAnalyser : AudioContext 객체의 주파수 데이터를 분석에 사용할 수 있는 객체를 생성
 analyserNode.fftSize = 2048;
@@ -71,6 +72,7 @@ function getFrequencyData() {
 
 // 50ms 주기로 마이크 사용 정보 체크
 setInterval(getFrequencyData, 50);
+
 // 사용자가 말하고있는 상태 감지 코드 E
 
 $(function(){
@@ -79,7 +81,7 @@ $(function(){
 });
 
 function start() {
-    // 소켓 연결
+    // 소켓 연결(wss - web socket ssl) - 서버가 https
     socket = new WebSocket("wss://" + location.host + "/signal");
     socket.binaryType = 'arraybuffer';
 
@@ -223,6 +225,7 @@ function handlePeerConnection() {
     mediaSetting();
 }
 
+// rtcPeerConnection 세팅
 function createPeerConnection() {
     // rtcPeerConnection 초기화
     myPeerConnection = new RTCPeerConnection(peerConnectionConfig);
@@ -251,7 +254,7 @@ function mediaSetting() {
         .then(getLocalMediaStream).catch(handleGetUserMediaError);
 }
 
-// add MediaStream to local video element and to the Peer
+// 자신의 비디오에 mediaStream을 적용 및 rtcPeerConnection에 등록(상대방에게 전달)
 function getLocalMediaStream(mediaStream) {
     localStream = mediaStream;
     localVideo.srcObject = mediaStream;
@@ -264,7 +267,7 @@ function getLocalMediaStream(mediaStream) {
     });
 }
 
-// handle get media error
+// 미디어 에러 처리
 function handleGetUserMediaError(error) {
     log('navigator.getUserMedia error: ', error);
     switch(error.name) {
@@ -589,8 +592,8 @@ function init() {
         const file = $('div.input-div input[type=file]').get(0).files[0];
 
         // 용량 제한 체크
-        if (file && file.size > 200 * 1024 * 1024) { // 200MB 이상인 경우
-            alert("200MB 이하의 파일만 첨부 가능합니다.");
+        if (file && file.size > 64 * 1024) { // 64kb 이상인 경우
+            alert("64KB 이하의 파일만 첨부 가능합니다.");
             clearFileInput();
             return;
         }
@@ -620,8 +623,8 @@ function init() {
         const file = files[0];
 
         // 용량 제한 체크
-        if (file && file.size > 200 * 1024 * 1024) { // 200MB 이상인 경우
-            alert("200MB 이하의 파일만 첨부 가능합니다.");
+        if (file && file.size > 64 * 1024) { // 64kb 이상인 경우
+            alert("64KB 이하의 파일만 첨부 가능합니다.");
             return;
         }
 

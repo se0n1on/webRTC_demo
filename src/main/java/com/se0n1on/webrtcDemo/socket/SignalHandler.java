@@ -1,9 +1,9 @@
-package com.huvet.tg.socket;
+package com.se0n1on.webrtcDemo.socket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.huvet.tg.domain.Room;
-import com.huvet.tg.domain.RoomService;
-import com.huvet.tg.domain.WebSocketMessage;
+import com.se0n1on.webrtcDemo.domain.Room;
+import com.se0n1on.webrtcDemo.domain.RoomService;
+import com.se0n1on.webrtcDemo.domain.WebSocketMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,8 +27,11 @@ public class SignalHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(final WebSocketSession session, final CloseStatus status) {
+        // 소켓이 닫혔을때
         logger.debug("[ws] Session has been closed with status {}", status);
         final Room room = sessionIdToRoomMap.get(session.getId());
+
+        // 사용자를 방에서 삭제
         Optional<String> client = roomService.getClients(room).entrySet().stream()
             .filter(entry -> Objects.equals(entry.getValue().getId(), session.getId()))
             .map(Map.Entry::getKey)
@@ -54,6 +57,8 @@ public class SignalHandler extends TextWebSocketHandler {
 
                 case "videoStreamOn": case "videoStreamOff": case "audioStreamOn": case "audioStreamOff": case "shareStreamOn": case "shareStreamOff": case "text":
                     logger.debug("[ws] Stream or Text: {}",data);
+
+                    // 비디오 on/off, 오디오 on/off, 화면 공유 on/off, 텍스트를 다른 사용자에게 전달
                     if (room != null) {
                         Map<String, WebSocketSession> clients = roomService.getClients(room);
                         for(Map.Entry<String, WebSocketSession> client : clients.entrySet()) {
@@ -72,6 +77,8 @@ public class SignalHandler extends TextWebSocketHandler {
 
                 case "offer": case "answer": case "ice":
                     logger.debug("[ws] type {} message received", message.getType());
+
+                    // 그대로 다른 사용자에게 전달
                     if (room != null) {
                         Map<String, WebSocketSession> clients = roomService.getClients(room);
                         for(Map.Entry<String, WebSocketSession> client : clients.entrySet())  {
@@ -90,6 +97,8 @@ public class SignalHandler extends TextWebSocketHandler {
 
                 case "join":
                     logger.debug("[ws] {} has joined Room: #{}", userName, data);
+
+                    // 사용자를 방에 등록
                     Room firstRoom = roomService.findRoomByStringId(data)
                             .orElseThrow(() -> new IOException("Invalid room number received!"));
                     roomService.addClient(firstRoom, userName, session);
@@ -98,6 +107,8 @@ public class SignalHandler extends TextWebSocketHandler {
 
                 case "leave":
                     logger.debug("[ws] {} has leaved Room: #{}", userName, data);
+
+                    // 다른 사용자에게 방 나감을 전달
                     if (room != null) {
                         Map<String, WebSocketSession> clients = roomService.getClients(room);
                         for(Map.Entry<String, WebSocketSession> client : clients.entrySet()) {
@@ -113,6 +124,7 @@ public class SignalHandler extends TextWebSocketHandler {
                             }
                     }
 
+                    // 사용자를 방에서 삭제
                     Optional<String> client = roomService.getClients(room).entrySet().stream()
                             .filter(entry -> Objects.equals(entry.getValue().getId(), session.getId()))
                             .map(Map.Entry::getKey)
@@ -133,6 +145,8 @@ public class SignalHandler extends TextWebSocketHandler {
     @Override
     protected void handleBinaryMessage(final WebSocketSession session, final BinaryMessage message){
         final Room room = sessionIdToRoomMap.get(session.getId());
+
+        // 파일을 다른 사용자에게 전달
         try {
             if (room != null) {
                 Map<String, WebSocketSession> clients = roomService.getClients(room);

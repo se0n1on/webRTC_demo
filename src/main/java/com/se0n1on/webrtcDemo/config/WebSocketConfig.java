@@ -1,6 +1,6 @@
-package com.huvet.tg.config;
+package com.se0n1on.webrtcDemo.config;
 
-import com.huvet.tg.socket.SignalHandler;
+import com.se0n1on.webrtcDemo.socket.SignalHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.WebSocketHandler;

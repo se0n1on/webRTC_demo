@@ -1,4 +1,4 @@
-package com.huvet.tg.service;
+package com.se0n1on.webrtcDemo.service;
 
 import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.ModelAndView;

@@ -1,8 +1,8 @@
-package com.huvet.tg.service;
+package com.se0n1on.webrtcDemo.service;
 
-import com.huvet.tg.domain.Room;
-import com.huvet.tg.domain.RoomService;
-import com.huvet.tg.util.Parser;
+import com.se0n1on.webrtcDemo.domain.Room;
+import com.se0n1on.webrtcDemo.domain.RoomService;
+import com.se0n1on.webrtcDemo.util.Parser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

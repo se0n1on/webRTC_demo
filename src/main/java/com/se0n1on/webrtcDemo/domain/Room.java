@@ -1,4 +1,4 @@
-package com.huvet.tg.domain;
+package com.se0n1on.webrtcDemo.domain;
 
 import org.springframework.web.socket.WebSocketSession;
 

@@ -1,4 +1,4 @@
-package com.huvet.tg.vo;
+package com.se0n1on.webrtcDemo.vo;
 
 import lombok.Builder;
 import lombok.Data;
