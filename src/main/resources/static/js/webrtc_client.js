@@ -87,6 +87,7 @@ function start() {
 
     socket.onmessage = function(msg) {
         if(typeof msg.data === "string"){
+            // 텍스트 메시지
             let message = JSON.parse(msg.data);
             switch (true) {
                 case message.type.includes("Stream"):
@@ -130,6 +131,7 @@ function start() {
                     handleErrorMessage('Wrong type message received from server');
             }
         }else{
+            // 바이너리 메시지
             log(msg.data instanceof ArrayBuffer);
             receiveFileMessage(msg.data)
         }
@@ -148,6 +150,7 @@ function start() {
     setTimeout(() => {
 			if (socket.readyState !== 1) {
 				log("socket abnormal close. reconnect.");
+                start();
 			}
 		}, 3000);
 
@@ -158,8 +161,7 @@ function start() {
         }else if (event.code === 1006) {
             log(`socket server error(code=${event.code})`);
             start();
-        }
-        else {
+        }else {
             log(`socket close state(code=${event.code})`);
         }
     };
