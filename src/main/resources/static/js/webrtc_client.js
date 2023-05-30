@@ -8,7 +8,7 @@ const audioButtonOn = document.querySelector('#audio_on');
 const sharingButtonOn = document.querySelector('#share_on');
 const sharingButtonOff = document.querySelector('#share_off');
 const exitButton = document.querySelector('#exit');
-const localRoom = document.querySelector('input#id').value;
+const localRoom = document.querySelector('input#roomId').value;
 const localVideo = document.getElementById('local_video');
 const remoteVideo = document.getElementById('remote_video');
 const localUserName = localStorage.getItem("uuid");
@@ -469,40 +469,9 @@ sharingButtonOn.onclick = async () => {
     ]);
 
     // 브라우저 공유 중지 버튼을 눌렀을때 화면 공유 off
-    // 변경
     combinedStream.getVideoTracks()[0].onended = function () {
         //Jquery trigger
         $(sharingButtonOff).trigger("click");
-
-        localStream.getTracks().forEach(track => {
-            track.stop();
-            localStream.removeTrack(track);
-            myPeerConnection.removeTrack(myPeerConnection.getSenders().find(sender => sender.track === track));
-        });
-
-        // 사용자의 스트림을 가져옴
-        navigator.mediaDevices.getUserMedia(userConstraints)
-            .then((userStream) => {
-                localStream = userStream;
-                localVideo.srcObject = userStream;
-                localStream.getTracks().forEach(track => {
-                    myPeerConnection.addTrack(track, localStream);
-                });
-            }).catch(handleGetUserMediaError);
-
-        // 원래 사용자의 설정대로
-        if(videoFlag)
-            $(localVideo).css('display', 'inline');
-        else
-            $(localVideo).css('display', 'none');
-        localVideo.muted = !audioFlag;
-
-        // 상대방에게 화면공유 비활성화를 알림
-        sendToServer({
-            from: localUserName,
-            type: 'shareStreamOff',
-            data: localRoom
-        });
     }
 
     localStream = combinedStream;
@@ -556,8 +525,7 @@ sharingButtonOff.onclick = () => {
     });
 };
 
-// 변경
-// 상대방이 방을 나갔을때
+// 상대방이 방을 나갔을때경
 function handlePeerLeave() {
     remoteVideo.srcObject = null;
 }

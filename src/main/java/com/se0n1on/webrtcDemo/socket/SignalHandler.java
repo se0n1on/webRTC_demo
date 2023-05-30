@@ -25,9 +25,9 @@ public class SignalHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private Map<String, Room> sessionIdToRoomMap = new HashMap<>();
 
+    // 소켓이 닫혔을때
     @Override
     public void afterConnectionClosed(final WebSocketSession session, final CloseStatus status) {
-        // 소켓이 닫혔을때
         logger.debug("[ws] Session has been closed with status {}", status);
         final Room room = sessionIdToRoomMap.get(session.getId());
 
@@ -40,11 +40,13 @@ public class SignalHandler extends TextWebSocketHandler {
         sessionIdToRoomMap.remove(session.getId());
     }
 
+    // 소켓이 열렸을때
     @Override
     public void afterConnectionEstablished(final WebSocketSession session) {
         sendMessage(session, new WebSocketMessage("Server", "join", null, null, null));
     }
 
+    // 텍스트 메시지를 받았을때
     @Override
     protected void handleTextMessage(final WebSocketSession session, final TextMessage textMessage) {
         // a message has been received
@@ -106,7 +108,7 @@ public class SignalHandler extends TextWebSocketHandler {
                     break;
 
                 case "leave":
-                    logger.debug("[ws] {} has leaved Room: #{}", userName, data);
+                    logger.debug("[ws] {} has left Room: #{}", userName, data);
 
                     // 다른 사용자에게 방 나감을 전달
                     if (room != null) {
@@ -142,6 +144,17 @@ public class SignalHandler extends TextWebSocketHandler {
         }
     }
 
+    // 텍스트 메시지를 보냄(바이너리는 바로 전송)
+    private void sendMessage(WebSocketSession session, WebSocketMessage message) {
+        try {
+            String json = objectMapper.writeValueAsString(message);
+            session.sendMessage(new TextMessage(json));
+        } catch (IOException e) {
+            logger.debug("An error occured: {}", e.getMessage());
+        }
+    }
+
+    // 바이너리 메시지를 받았을때
     @Override
     protected void handleBinaryMessage(final WebSocketSession session, final BinaryMessage message){
         final Room room = sessionIdToRoomMap.get(session.getId());
@@ -157,15 +170,6 @@ public class SignalHandler extends TextWebSocketHandler {
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    private void sendMessage(WebSocketSession session, WebSocketMessage message) {
-        try {
-            String json = objectMapper.writeValueAsString(message);
-            session.sendMessage(new TextMessage(json));
-        } catch (IOException e) {
-            logger.debug("An error occured: {}", e.getMessage());
         }
     }
 }

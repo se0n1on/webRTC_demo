@@ -8,27 +8,15 @@ import lombok.RequiredArgsConstructor;
 @Data
 @NoArgsConstructor
 public class RoomVo {
-    private String sid;
-
-    private String uuid;
-
-    private String userName;
+   private Long roomId;
+    private int concurrentUsers;
 
     @Builder
     public RoomVo(
-            String sid,
-            String uuid,
-            String userName
+            Long roomId,
+            int concurrentUsers
     ){
-        this.sid = sid;
-        this.uuid = uuid;
-        this.userName = userName;
-    }
-
-    @Builder
-    public RoomVo(
-            String sid
-    ){
-        this.sid = sid;
+        this.roomId = roomId;
+        this.concurrentUsers = concurrentUsers;
     }
 }

@@ -21,4 +21,4 @@ server:
 logging:
   level:
     org.springframework: info
-    com.huvet.tg: debug
+    com.se0n1on.webrtcDemo: debug
