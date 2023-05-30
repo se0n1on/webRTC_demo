@@ -7,6 +7,5 @@ public interface MainService {
     ModelAndView displayMainPage(Long id, String uuid);
     ModelAndView displaySelectedRoom(String sid, String uuid, String userName);
     ModelAndView processRoomExit(String sid, String uuid);
-
     RoomVo concurrentUserCheck(String roomID);
 }
